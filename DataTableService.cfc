@@ -1,51 +1,51 @@
 <!---
-Author:	
+Author:
 	Bradley Moore
 	orangexception.com
 	@orangexception on Twitter
-	
+
 Description:
 	ColdFusion Server Methods for DataTables
 	See http://www.datatables.net/usage/server-side for more details.
-	
+
 Language Support:
 	CF8
 	Railo 3.1
-	
+
 DataTableService.cfc Usage:
 	// Single model result, Controller determines how to use the data
 	qExample= oModel.getQuery();
 	oDataTableResult= oDataTableService.toObject( stParameters , qExample );
-	
+
 	if( request.bAJAX )
 		sJSON= oResult.toJSON();
-	
-	else	
+
+	else
 		qExample= oResult.toQuery();
-	
+
 	--
 	// Straight conversion to JSON
 	qExample= oModel.getQuery();
 	sJSON= oDataTableService.toJSON( stParameters , qExample );
-	
+
 	--
 	// Sort and Search a query using DataTable parameters
 	qExample= oModel.getQuery();
 	qExample= oDataTableService.toQuery( stParameters , qExample );
-	
+
 History:
 	2011.1.17	Foundation
-	
+
 --->
 
 <cfcomponent displayname= "DataTableService"
 	output= false
 	hint= "Handles server interactions for DataTables">
-	
+
 	<cffunction name= "toObject"
 		output= false
 		hint= "I convert Parameters and Query arguments into an object, which let's you export data into types later.  I am useful for outputting data based upon url variables.">
-		
+
 		<cfargument name= "Parameters"
 			required= true
 			hint= "I am a structure of unmodified parameters from a DataTables event.  I'll handle converting these into a more useful collection." />
@@ -53,33 +53,33 @@ History:
 		<cfargument name= "Query"
 			required= true
 			hint= "I am the query on which I perform actions." />
-			
+
 		<cfscript>
 		var oResult= "";
 		var stParameters= "";
 		var qResult= "";
-		
+
 		stParameters= convertParameters( Parameters );
-		
+
 		//Total Records prior to manipulation
 		stParameters.iTotalRecords= Query.recordCount;
-		
+
 		qResult= searchAndSortQuery( stParameters , Query );
-		
+
 		//Total Records of searched result
 		stParameters.iTotalDisplayRecords= qResult.recordCount;
-		
+
 		oResult= createObject( "component" , "DataTableObject" ).init( stParameters , qResult );
 		return oResult;
-		
+
 		</cfscript>
-			
+
 	</cffunction>
 
 	<cffunction name= "toQuery"
 		output= false
 		hint= "I search and sort a Query based upon DataTables Parameters, which is useful for exporting data.">
-		
+
 		<cfargument name= "Parameters"
 			required= true
 			hint= "I am a structure of unmodified parameters from an event.  I'll handle converting these into a more useful collection." />
@@ -87,18 +87,18 @@ History:
 		<cfargument name= "Query"
 			required= true
 			hint= "I am the query on which I perform actions." />
-			
+
 		<cfscript>
-		return toObject( Parameters , Query ).toQuery();
-		
+		return toObject( argumentCollection= arguments ).toQuery();
+
 		</cfscript>
 
 	</cffunction>
-	
+
 	<cffunction name= "toJSON"
 		output= false
 		hint= "I convert Parameters and Query arguments into DataTables JSON Format">
-		
+
 		<cfargument name= "Parameters"
 			required= true
 			hint= "I am a structure of unmodified parameters from an event.  I'll handle converting these into a more useful collection." />
@@ -106,14 +106,14 @@ History:
 		<cfargument name= "Query"
 			required= true
 			hint= "I am the query on which I perform actions." />
-			
+
 		<cfscript>
-		return toObject( Parameters , Query ).toJSON();
-		
+		return toObject( argumentCollection= arguments ).toJSON();
+
 		</cfscript>
 
 	</cffunction>
-	
+
 	<cffunction name= "convertParameters"
 		output= false
 		access= "private"
@@ -130,7 +130,7 @@ History:
 		var stColumn= "";
 		var stParameters= "";
 		var stSortingColumn= "";
-		
+
 		stParameters= {
 			iDisplayStart= Parameters.iDisplayStart ,
 			iDisplayLength= Parameters.iDisplayLength ,
@@ -202,7 +202,7 @@ History:
 		</cfscript>
 
 	</cffunction>
-	
+
 	<cffunction name= "searchAndSortQuery"
 		output= false
 		access= "private"
@@ -238,10 +238,10 @@ History:
 
 		<cfsavecontent variable= "sOrderBy">
 		<cfoutput>
-		<cfif len( stParameters.iSortingCols ) 
+		<cfif len( stParameters.iSortingCols )
 			and stParameters.iSortingCols
 			and arrayLen( stParameters.sortingColumns )>
-			
+
 			<cfloop array= "#stParameters.sortingColumns#" index= "stSortingColumn">
 				<cfif listFindNoCase( lsColumnNames , stSortingColumn.name )>
 					#stSortingColumn.name#
@@ -282,7 +282,7 @@ History:
 
 			<cfloop array= "#stParameters.columns#" index= "stSearchColumn">
 				<cfif listFindNoCase( lsColumnNames , stSearchColumn.name )>
-				or CAST( lower( [#stSearchColumn.name#] ) AS VARCHAR ) like 
+				or CAST( lower( [#stSearchColumn.name#] ) AS VARCHAR ) like
 					<cfqueryparam cfsqltype= "varchar" value= "%#lcase( stParameters.sSearch )#%" />
 
 				</cfif>

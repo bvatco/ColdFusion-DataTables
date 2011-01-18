@@ -1,0 +1,36 @@
+Author:
+	Bradley Moore
+	orangexception.com
+	@orangexception on Twitter
+
+Description:
+	ColdFusion Server Methods for DataTables
+	See http://www.datatables.net/usage/server-side for more details.
+
+Language Support:
+	CF8
+	Railo 3.1
+
+DataTableService.cfc Usage:
+	// Single model result, Controller determines how to use the data
+	qExample= oModel.getQuery();
+	oDataTableResult= oDataTableService.toObject( stParameters , qExample );
+
+	if( request.bAJAX )
+		sJSON= oResult.toJSON();
+
+	else
+		qExample= oResult.toQuery();
+
+	--
+	// Straight conversion to JSON
+	qExample= oModel.getQuery();
+	sJSON= oDataTableService.toJSON( stParameters , qExample );
+
+	--
+	// Sort and Search a query using DataTable parameters
+	qExample= oModel.getQuery();
+	qExample= oDataTableService.toQuery( stParameters , qExample );
+
+History:
+	2011.1.17	Foundation
