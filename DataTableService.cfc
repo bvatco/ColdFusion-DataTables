@@ -1,40 +1,13 @@
 <!---
-Author:
+Author
 	Bradley Moore
 	orangexception.com
 	@orangexception on Twitter
 
-Description:
+Description
 	ColdFusion Server Methods for DataTables
-	See http://www.datatables.net/usage/server-side for more details.
-
-Language Support:
-	CF8
-	Railo 3.1
-
-DataTableService.cfc Usage:
-	// Single model result, Controller determines how to use the data
-	qExample= oModel.getQuery();
-	oDataTableResult= oDataTableService.toObject( stParameters , qExample );
-
-	if( request.bAJAX )
-		sJSON= oResult.toJSON();
-
-	else
-		qExample= oResult.toQuery();
-
-	--
-	// Straight conversion to JSON
-	qExample= oModel.getQuery();
-	sJSON= oDataTableService.toJSON( stParameters , qExample );
-
-	--
-	// Sort and Search a query using DataTable parameters
-	qExample= oModel.getQuery();
-	qExample= oDataTableService.toQuery( stParameters , qExample );
-
-History:
-	2011.1.17	Foundation
+	See http://www.datatables.net/usage/server-side for more details on DataTables.
+	See README for language support, usage, and history.
 
 --->
 
@@ -58,18 +31,23 @@ History:
 		var oResult= "";
 		var stParameters= "";
 		var qResult= "";
+		var aQueryMetaData= "";
+
+		aQueryMetaData= getMetaData( Query );
 
 		stParameters= convertParameters( Parameters );
 
 		//Total Records prior to manipulation
 		stParameters.iTotalRecords= Query.recordCount;
 
-		qResult= searchAndSortQuery( stParameters , Query );
+		qResult= searchAndSortQuery( stParameters , Query , aQueryMetaData );
+
+		qResult= formatQuery( qResult , aQueryMetaData );
 
 		//Total Records of searched result
 		stParameters.iTotalDisplayRecords= qResult.recordCount;
 
-		oResult= createObject( "component" , "DataTableObject" ).init( stParameters , qResult );
+		oResult= createObject( "component" , "DataTableObject" ).init( stParameters , qResult , aQueryMetaData );
 		return oResult;
 
 		</cfscript>
@@ -218,6 +196,10 @@ History:
 			output= false
 			hint= "I am the query on which I perform actions." />
 
+		<cfargument name= "aQueryMetaData"
+			required= true
+			hint= "I am the meta data from the original query." />
+
 		<cfscript>
 		var bFirstColumn= true;
 		var iColumnPosition= 0;
@@ -226,6 +208,9 @@ History:
 		var qResult= "";
 		var sColumnName= "";
 		var sOrderBy= "";
+		var sSelect= "";
+		var sTypeName= "";
+		var stColumn= "";
 		var stSearchColumn= "";
 		var stSortingColumn= "";
 
@@ -236,8 +221,40 @@ History:
 
 		</cfscript>
 
-		<cfsavecontent variable= "sOrderBy">
+		<!--- Columns to Select --->
+		<cfsavecontent variable= "sSelect">
+
 		<cfoutput>
+
+		<cfloop array= "#aQueryMetaData#" index= "stColumn">
+			<cfif listFindNoCase( lsColumnNames , stColumn.Name )>
+				<cfif bFirstColumn eq false>
+					,
+
+				</cfif>
+
+				#stColumn.Name#
+
+				<cfset bFirstColumn= false />
+
+			</cfif>
+
+		</cfloop>
+
+		</cfoutput>
+
+		</cfsavecontent>
+
+		<cfif len( trim( sSelect ) ) eq 0>
+			<cfset sSelect= lsColumnNames />
+
+		</cfif>
+
+		<!--- Columns to Order By --->
+		<cfsavecontent variable= "sOrderBy">
+
+		<cfoutput>
+
 		<cfif len( stParameters.iSortingCols )
 			and stParameters.iSortingCols
 			and arrayLen( stParameters.sortingColumns )>
@@ -245,8 +262,20 @@ History:
 			<cfloop array= "#stParameters.sortingColumns#" index= "stSortingColumn">
 				<cfif listFindNoCase( lsColumnNames , stSortingColumn.name )>
 					#stSortingColumn.name#
-					<cfif listFindNoCase( stSortingColumn.dir , "DESC" )>DESC<cfelse>ASC</cfif>
-					<cfif iSortingColumnCount lt stParameters.iSortingCols>,</cfif>
+
+					<cfif listFindNoCase( stSortingColumn.dir , "DESC" )>
+						DESC
+
+					<cfelse>
+						ASC
+
+					</cfif>
+
+					<cfif iSortingColumnCount lt stParameters.iSortingCols>
+						,
+
+					</cfif>
+
 					<cfset iSortingColumnCount++ />
 
 				</cfif>
@@ -254,34 +283,26 @@ History:
 			</cfloop>
 
 		</cfif>
+
 		</cfoutput>
+
 		</cfsavecontent>
-		<cfset sOrderBy= trim( sOrderBy ) />
 
 		<cfquery name= "qResult" dbtype= "query">
 		select
-		<!--- Columns to display --->
-			<cfloop list= "#stParameters.sColumns#" index= "sColumnName">
-				<cfset iColumnPosition= listFindNoCase( lsColumnNames , sColumnName ) />
-				<cfif iColumnPosition>
-					<cfif bFirstColumn eq false>,</cfif>
-					#sColumnName#
-					<cfset bFirstColumn= false />
-
-				</cfif>
-
-			</cfloop>
+			#sSelect#
 
 		  from [Query]
-		 where 1= 1 <!---  any  --->
+		 where 1= 1	<!---  Matches everything.  Allows for conditional AND syntax below.  --->
 
 		<!--- Search --->
 		<cfif len( stParameters.sSearch )>
 		and (
-			1= 0 <!---  none  --->
+			1= 0	<!---  Matches nothing. Allows for conditional OR syntax below. --->
 
 			<cfloop array= "#stParameters.columns#" index= "stSearchColumn">
 				<cfif listFindNoCase( lsColumnNames , stSearchColumn.name )>
+				<!--- TODO: Possible SQL Injection here? [#stSearchColumn.name#] Try and queryparam it. --->
 				or CAST( lower( [#stSearchColumn.name#] ) AS VARCHAR ) like
 					<cfqueryparam cfsqltype= "varchar" value= "%#lcase( stParameters.sSearch )#%" />
 
@@ -293,13 +314,108 @@ History:
 		</cfif>
 
 		<!--- Order --->
-		<cfif len( sOrderBy )>
+		<cfif len( trim( sOrderBy ) )>
 		order by #sOrderBy#
+
 		</cfif>
 
 		</cfquery>
 
 		<cfreturn qResult />
+
+	</cffunction>
+
+	<cffunction name= "formatQuery"
+		output= false
+		access= "private"
+		hint= "I apply custom formating to a Query">
+
+		<cfargument name= "Query"
+			required= true
+			output= false
+			hint= "I am the query on which I perform actions." />
+
+		<cfargument name= "aQueryMetaData"
+			required= true
+			hint= "I am the meta data from the original query." />
+
+		<!--- This function converts all columns to VARCHAR data types
+			in order to apply formatting. --->
+
+		<cfscript>
+		var bFirstColumn= true;
+		var lsColumnNames= "";
+		var sSelect= "";
+		var stColumn= "";
+
+		lsColumnNames= Query.columnList;
+
+		</cfscript>
+
+		<!--- Columns to Select --->
+		<cfsavecontent variable= "sSelect">
+
+		<cfoutput>
+
+		<cfloop array= "#aQueryMetaData#" index= "stColumn">
+			<cfif listFindNoCase( lsColumnNames , stColumn.Name )>
+				<cfif bFirstColumn eq false>
+					,
+
+				</cfif>
+
+				cast( #stColumn.Name# as VARCHAR ) #stColumn.Name#
+
+				<cfset bFirstColumn= false />
+
+			</cfif>
+
+		</cfloop>
+
+		</cfoutput>
+
+		</cfsavecontent>
+
+		<cfif len( trim( sSelect ) ) eq 0>
+			<cfset sSelect= lsColumnNames />
+
+		</cfif>
+
+		<cfquery name= "Query" dbtype= "query">
+		select
+			#sSelect#
+
+		  from [Query]
+
+		</cfquery>
+
+		<!--- TODO: Move loop below into query of query above. --->
+		<cfloop query= "Query">
+			<cfloop array= "#aQueryMetaData#" index= "stColumn">
+
+				<!--- Dollar Format --->
+				<!--- TODO: Change DollarFormat to work with International currencies --->
+				<cfif listFindNoCase( "money,smallmoney" , stColumn.TypeName )>
+					<cfset querySetCell( Query ,
+						stColumn.Name ,
+						dollarFormat( Query[ stColumn.Name ][ currentRow ] ) ,
+						currentRow ) />
+
+				<!--- Date & Time Format --->
+				<cfelseif listFindNoCase( "datetime,timestamp" , stColumn.TypeName )>
+					<cfset querySetCell( Query ,
+						stColumn.Name ,
+						dateFormat( Query[ stColumn.Name ][ currentRow ] , "mm/dd/yyyy" )
+						& timeFormat( Query[ stColumn.Name ][ currentRow ] , " h:mm tt" ) ,
+						currentRow ) />
+
+				</cfif>
+
+			</cfloop>
+
+		</cfloop>
+
+		<cfreturn Query />
 
 	</cffunction>
 

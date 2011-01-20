@@ -1,33 +1,24 @@
 <!---
-Author:	
+Author
 	Bradley Moore
 	orangexception.com
 	@orangexception on Twitter
-	
-Description:
+
+Description
 	ColdFusion Server Methods for DataTables
-	See http://www.datatables.net/usage/server-side for more details.
-	
-Language Support:
-	CF8
-	Railo 3.1
-	
-DataTableObject.cfc Usage:
-	This object is created by DataTableService.
-	
-History:
-	2011.1.17	Foundation
+	See http://www.datatables.net/usage/server-side for more details on DataTables.
+	See README for language support, usage, and history.
 
 --->
 
 <cfcomponent displayname= "DataTableObject"
 	output= false
 	hint= "Handles data output for DataTable results">
-	
+
 	<cffunction name= "init"
 		output= false
 		hint= "I am the constructor.">
-		
+
 		<cfargument name= "stParameters"
 			required= true
 			hint= "I am a useful collection of Parameters for dealing with qResult." />
@@ -35,13 +26,18 @@ History:
 		<cfargument name= "qResult"
 			required= true
 			hint= "I am the searched and sorted query result." />
-			
+
+		<cfargument name= "aQueryMetaData"
+			required= true
+			hint= "I am the meta data from the original query." />
+
 		<cfscript>
 		set( "stParameters" , stParameters );
 		set( "qResult" , qResult );
-		
+		set( "aQueryMetaData" , aQueryMetaData );
+
 		return this;
-		
+
 		</cfscript>
 
 	</cffunction>
@@ -49,44 +45,83 @@ History:
 	<cffunction name= "toQuery"
 		output= false
 		hint= "I return a query of the sorted and search DataTable event.">
-		
+
 		<cfscript>
 		return get( "qResult" );
-		
+
 		</cfscript>
 
 	</cffunction>
-	
+
 	<cffunction name= "toJSON"
 		output= false
 		hint= "I convert my parameters and query results into DataTables JSON Format">
-					
+
 		<cfscript>
 		var stParameters= get( "stParameters" );
 		var qResult= get( "qResult" );
-		
+
 		var pqResult= "";
-		
+
 		//Paginate and Format Query
-		pqResult= paginateAndFormatQuery();
+		pqResult= paginateQuery();
 
 		return paginatedResultToJSON( pqResult );
-		
+
 		</cfscript>
 
 	</cffunction>
-	
+
+	<cffunction name= "paginateQuery"
+		output= false
+		access= "private"
+		hint= "I paginate the qResult">
+
+		<cfscript>
+		var stParameters= get( "stParameters" );
+		var qResult= duplicate( get( "qResult" ) );
+		var aQueryMetaData= get( "aQueryMetaData" );
+
+		var iLastPage= 1;
+		var iPage= 1;
+		var iPageSize= 1;
+
+		if( stParameters.iDisplayLength > 0 ) {
+			iPage= int( stParameters.iDisplayStart / stParameters.iDisplayLength ) + 1;
+			iPageSize= stParameters.iDisplayLength;
+
+		}
+		else {
+			iPage= 1;
+			iPageSize= pqResult.recordCount;
+
+		}
+
+		//Last page may contain less than iDisplayLength
+		iLastPage= int( qResult.recordCount / stParameters.iDisplayLength ) + 1;
+		if( iPage == iLastPage )
+			iPageSize= qResult.recordCount % iPageSize;
+
+		qResult= QueryConvertForGrid( qResult , iPage , iPageSize );
+
+		return qResult;
+
+		</cfscript>
+
+	</cffunction>
+
 	<cffunction name= "paginateAndFormatQuery"
 		output= false
 		access= "private"
 		hint= "I paginate the qResult">
-		
+
 		<cfscript>
 		var stParameters= get( "stParameters" );
 		var qResult= duplicate( get( "qResult" ) );
-		
+		var aQueryMetaData= get( "aQueryMetaData" );
+
 		var pqResult= "";
-		
+
 		var bFirstColumn= true;
 		var iColumnPosition= 1;
 		var iLastPage= 1;
@@ -95,22 +130,19 @@ History:
 		var sColumnName= "";
 		var sColumnNames= "";
 		var stColumn= "";
-		var stQueryMetaData= "";
-		
-		stQueryMetaData= getMetaData( qResult );
 
-		sColumnNames= qResult.columnList;
+		lsColumnNames= qResult.columnList;
 
 		if( len( stParameters.sColumns ) == 0 )
-			stParameters.sColumns= sColumnNames;
+			stParameters.sColumns= lsColumnNames;
 
 		</cfscript>
 
-		<!--- Convert Everything to VARCHAR to format --->
-		<cfquery name= "pqResult" dbtype= "query">
-		select
+		<!--- Columns to Select --->
+		<cfsavecontent variable= "sSelect">
+		<cfoutput>
 		<cfloop list= "#stParameters.sColumns#" index= "sColumnName">
-			<cfset iColumnPosition= listFindNoCase( sColumnNames , sColumnName ) />
+			<cfset iColumnPosition= listFindNoCase( lsColumnNames , sColumnName ) />
 			<cfif iColumnPosition>
 				<cfif bFirstColumn eq false>,</cfif>
 				<cfif listFindNoCase( "java.lang.String" , getMetaData( qResult[ sColumnName ][ 1 ] ).getName() )>
@@ -123,6 +155,21 @@ History:
 			</cfif>
 
 		</cfloop>
+		</cfoutput>
+		</cfsavecontent>
+		<cfset sSelect= trim( sSelect ) />
+
+		<cfif len( sSelect ) eq 0>
+			<cfset sSelect= lsColumnNames />
+
+		</cfif>
+
+
+		<!--- Convert Everything to VARCHAR to format --->
+		<cfquery name= "pqResult" dbtype= "query">
+		select
+			#sSelect#
+
 		  from [qResult]
 
 		</cfquery>
@@ -150,22 +197,22 @@ History:
 
 		<!--- Custom Formatting --->
 		<cfloop query= "pqResult.Query">
-			<cfloop array= "#stQueryMetaData#" index= "stColumn">
+			<cfloop array= "#aQueryMetaData#" index= "stColumn">
 
 				<!--- Dollar Format --->
 				<!--- TODO: Change DollarFormat to work with Canadian currency --->
-				<cfif listFindNoCase( "money,smallmoney" , stColumn.typeName )>
+				<cfif listFindNoCase( "money,smallmoney" , stColumn.TypeName )>
 					<cfset querySetCell( pqResult.Query ,
-						stColumn.name ,
-						dollarFormat( pqResult.Query[ stColumn.name ][ currentRow ] ) ,
+						stColumn.Name ,
+						dollarFormat( pqResult.Query[ stColumn.Name ][ currentRow ] ) ,
 						currentRow ) />
 
 				<!--- Date & Time Format --->
-				<cfelseif listFindNoCase( "datetime,timestamp" , stColumn.typeName )>
+				<cfelseif listFindNoCase( "datetime,timestamp" , stColumn.TypeName )>
 					<cfset querySetCell( pqResult.Query ,
-						stColumn.name ,
-						dateFormat( pqResult.Query[ stColumn.name ][ currentRow ] , "mm/dd/yyyy" )
-						& timeFormat( pqResult.Query[ stColumn.name ][ currentRow ] , " h:mm tt" ) ,
+						stColumn.Name ,
+						dateFormat( pqResult.Query[ stColumn.Name ][ currentRow ] , "mm/dd/yyyy" )
+						& timeFormat( pqResult.Query[ stColumn.Name ][ currentRow ] , " h:mm tt" ) ,
 						currentRow ) />
 
 				</cfif>
@@ -175,21 +222,21 @@ History:
 		</cfloop>
 
 		<cfreturn pqResult />
-		
+
 	</cffunction>
-	
+
 	<cffunction name= "paginatedResultToJSON"
 		output= false
 		access= "private"
 		hint= "I turn a paginated query into DataTables JSON Format">
-		
+
 		<cfargument name= "pqResult"
 			required= true
 			hint= "I am the pqResult from paginateAndFormatQuery" />
-			
+
 		<cfscript>
 		var stParameters= get( "stParameters" );
-		
+
 		var bLastColumn= false;
 		var iColumnCount= 1;
 		var iColumnLength= 1;
@@ -197,11 +244,11 @@ History:
 		var lsColumnNames= "";
 		var sJSON= "";
 		var sColumnName= "";
-		
+
 		// This is a quick and simple XSS check. You should implement your own XSS prevention.
 		if( isValid( "integer" , stParameters.sEcho ) eq false )
 			return "sEcho is invalid. Possible XSS attack.";
-			
+
 		lsColumnNames= pqResult.Query.columnList;
 
 		if( len( stParameters.sColumns ) == 0 )
@@ -221,8 +268,10 @@ History:
 	<cfset bLastColumn= false />
 </cfsilent>		[<cfloop list= "#stParameters.sColumns#" index= "sColumnName"><cfsilent>
 			<cfset iColumnPosition= listFindNoCase( lsColumnNames , sColumnName ) />
+
 			<cfif sColumnName eq "null">
 				<cfset iColumnPosition= -1/>
+
 			</cfif>
 </cfsilent>
 			<cfif iColumnPosition><cfif iColumnPosition eq -1>""<cfelse>"#pqResult.Query[ sColumnName ][ currentrow ]#"</cfif></cfif><cfsilent>
@@ -230,7 +279,7 @@ History:
 				<cfset iColumnCount++ />
 				<cfif iColumnCount gte iColumnLength>
 					<cfset bLastColumn= true />
-					
+
 				</cfif>
 
 </cfsilent></cfloop>
@@ -240,23 +289,23 @@ History:
 
 		<cfreturn trim( sJSON ) />
 	</cffunction>
-	
 
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+
+
+
+
+
+
+
+
+
+
+
+
 	<!--- Unrelated Functions --->
 	<cffunction	name= "instance"
-		output= false 
+		output= false
 		returntype= "struct"
 		hint= "I access the component properties">
 
@@ -290,7 +339,7 @@ History:
 			required= true
 			default= ""
 			hint= "I am the instance variable name"	/>
-			
+
 		<cfargument name= "value"
 			required= true
 			default= ""

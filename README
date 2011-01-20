@@ -1,36 +1,54 @@
-Author:
+Author
 	Bradley Moore
 	orangexception.com
 	@orangexception on Twitter
 
-Description:
+Description
 	ColdFusion Server Methods for DataTables
 	See http://www.datatables.net/usage/server-side for more details.
 
-Language Support:
+Language Support
 	CF8
-	Railo 3.1
 
-DataTableService.cfc Usage:
-	// Single model result, Controller determines how to use the data
-	qExample= oModel.getQuery();
-	oDataTableResult= oDataTableService.toObject( stParameters , qExample );
+Usage
+	Collection of request variables.
+		ColdBox Implementation
+			rc= Event.getCollection();
+			stParameters= rc;
 
-	if( request.bAJAX )
-		sJSON= oResult.toJSON();
+		Basic Implementation
+			stParameters= url;
+			structAppend( stParameters , form );
 
-	else
-		qExample= oResult.toQuery();
+	DataTableSerivce Instantiation
+		oDataTableService= createObject( "component" , "path.to.DataTableService" );
 
-	--
-	// Straight conversion to JSON
-	qExample= oModel.getQuery();
-	sJSON= oDataTableService.toJSON( stParameters , qExample );
+	Returns an object, which lets your controller determine how to use data.
+		qExample= oModel.getQuery();
+		oDataTableResult= oDataTableService.toObject( stParameters , qExample );
 
-	--
-	// Sort and Search a query using DataTable parameters
-	qExample= oModel.getQuery();
-	qExample= oDataTableService.toQuery( stParameters , qExample );
+		if( request.bAJAX )
+			sJSON= oDataTableResult.toJSON();
 
-History:
-	2011.1.17	Foundation
+		else
+			qExample= oDataTableResult.toQuery();
+
+	Returns JSON string ready for consumption by DataTables.
+		qExample= oModel.getQuery();
+		sJSON= oDataTableService.toJSON( stParameters , qExample );
+
+	Returns a query, which is useful for exporting results.
+		qExample= oModel.getQuery();
+		qExample= oDataTableService.toQuery( stParameters , qExample );
+
+History
+	2011.1.19
+		Fixed variable names in usage section
+		Fixed Issue -> Original Query Meta Data versus Query of Query Meta Data
+		Fixed Issue -> Data formatting is only applied to JSON
+
+	2011.1.18
+		Fixed Issue -> Invalid Column Names
+
+	2011.1.17
+		Foundation
