@@ -93,7 +93,7 @@ Description
 		}
 		else {
 			iPage= 1;
-			iPageSize= pqResult.recordCount;
+			iPageSize= qResult.recordCount;
 
 		}
 
