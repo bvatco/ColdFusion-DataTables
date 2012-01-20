@@ -274,7 +274,7 @@ Description
 
 			</cfif>
 </cfsilent>
-			<cfif iColumnPosition><cfif iColumnPosition eq -1>""<cfelse>"#pqResult.Query[ sColumnName ][ currentrow ].ReplaceAll( '(["\\])' , "\$1" )#"</cfif></cfif><cfsilent>
+			<cfif iColumnPosition><cfif iColumnPosition eq -1>""<cfelse>"#pqResult.Query[ sColumnName ][ currentrow ].ReplaceAll( '(["\\])' , "\$1" )#"</cfif><cfelse>""</cfif><cfsilent>
 			</cfsilent><cfif bLastColumn eq false>,</cfif><cfsilent>
 				<cfset iColumnCount++ />
 				<cfif iColumnCount gte iColumnLength>
