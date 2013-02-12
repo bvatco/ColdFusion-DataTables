@@ -42,6 +42,9 @@ Usage
 		qExample= oDataTableService.toQuery( stParameters , qExample );
 
 History
+	2013.2.12
+		Added components that rely on datasource to paginate. These should be used if your expected resultset is > 100 records.
+
 	2011.1.19
 		Fixed variable names in usage section
 		Fixed Issue -> Original Query Meta Data versus Query of Query Meta Data
