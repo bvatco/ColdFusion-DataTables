@@ -8,7 +8,7 @@ Description
 	See http://www.datatables.net/usage/server-side for more details.
 
 Language Support
-	CF8
+	CF8 (withoutQueryOfQueries requires CF9+)
 
 Usage
 	Collection of request variables.
