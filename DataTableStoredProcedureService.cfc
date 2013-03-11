@@ -8,7 +8,7 @@ component	name=		"DataTableStoredProcedureService"
 	property	name=	"lsColumnsToExcludeFromExport";
 	property	name=	"lsColumnNamesForExcelExport";
 
-	include	"../scrubRequestHelper.cfm";
+	include	"scrubRequestHelper.cfm";
 
 	function init (	storedProcedureName ,
 					astProcedureParameters ,
@@ -78,10 +78,10 @@ component	name=		"DataTableStoredProcedureService"
 
 
 	function	json ( stParameters ) {
-		var	oDataTableService=	createObject( "lib.orangexception.ColdFusionDataTables.no-query-of-queries.DataTableService" );
+		var	oDataTableService=	createObject( "lib.orangexception.ColdFusionDataTables.DataTableService" );
 		var stResult=	getQuery( argumentCollection= arguments );
 
-		return	oDataTableService.toJSON( stParameters , stResult.qResult , stResult.pRowCount );
+		return	oDataTableService.toJSON( stParameters , stResult.qResult );
 	}
 
 	function	excel ( stParameters ) {
@@ -137,7 +137,7 @@ component	name=		"DataTableStoredProcedureService"
 	}
 
 	function	prepareForExport ( stParameters ) {
-		var	oDataTableService=	createObject( "lib.orangexception.ColdFusionDataTables.no-query-of-queries.DataTableService" );
+		var	oDataTableService=	createObject( "lib.orangexception.ColdFusionDataTables.DataTableService" );
 		var oResult=	new	app.models.service.ResultService();
 			oResult=	oResult.new();
 		var	stResult=	getQuery( argumentCollection= arguments );
@@ -169,6 +169,7 @@ component	name=		"DataTableStoredProcedureService"
 
 		}
 
+		oResult.qResult=	qResult;
 		stResult=	{	oResult=	oResult ,
 						qResult=	qResult };
 

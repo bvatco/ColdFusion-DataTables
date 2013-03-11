@@ -15,7 +15,7 @@ component	name=		"DataTableController"
 					layout ,
 					view ,
 					PDFExportEvent=	"" ,
-					exportFileNamePrefix=	getHash() ) {
+					exportFileNamePrefix=	CreateUUID() ) {
 		super.init( controller );
 
 		setDataTableService( oDataTableService );
@@ -56,6 +56,8 @@ component	name=		"DataTableController"
 
 	function	export ( Event ) {
 		var rc= Event.getCollection();
+			rc.iDisplayLength=		-1;
+			rc.iDisplayStart=		0;
 			rc.stParameters=		duplicate( rc );
 			rc.oResult.sContent=	'';
 			rc.sExportType=			replace( rc.sExportType , " slvzr-hover" , "" );
@@ -73,6 +75,7 @@ component	name=		"DataTableController"
 
 		else if( rc.sExportType == "TAB" )
 			rc.oResult= getDataTableService().TabDelimited( argumentCollection= rc );
+
 
 		else if( rc.sExportType == "PIPE" )
 			rc.oResult= getDataTableService().PipeDelimited( argumentCollection= rc );

@@ -15,6 +15,8 @@ Description
 	output= false
 	hint= "Handles server interactions for DataTables">
 
+	<cfinclude	template=	"scrubRequestHelper.cfm" />
+
 	<cffunction name= "toObject"
 		output= false
 		hint= "I convert Parameters and Query arguments into an object, which let's you export data into types later.  I am useful for outputting data based upon url variables.">
@@ -109,6 +111,15 @@ Description
 		var stParameters= "";
 		var stSortingColumn= "";
 
+		param	name=	"Parameters.iColumns"
+				default=	"#ListLen( Parameters.sColumns )#";
+		param	name=	"Parameters.sSearch"
+				default=	"";
+		param	name=	"Parameters.sEcho"
+				default=	"";
+		param	name=	"Parameters.iSortingCols"
+				default=	"0";
+
 		stParameters= {
 			iDisplayStart= Parameters.iDisplayStart ,
 			iDisplayLength= Parameters.iDisplayLength ,
@@ -125,9 +136,12 @@ Description
 		if( structKeyExists( Parameters , "bEscapeRegex" ) )
 			stParameters.bEscapeRegex= Parameters.bEscapeRegex;
 
+		if( len( Parameters.iColumns ) == 0 )
+			Parameters.iColumns=	ListLen( Parameters.sColumns );
+
 		if( len( Parameters.sColumns ) ) {
 			// Build Columns
-			for( iPosition= 0; iPosition < Parameters.iColumns && listLen( Parameters.sColumns ) >= iPosition ; iPosition++ ) {
+			for( iPosition= 0; iPosition < Parameters.iColumns && listLen( Parameters.sColumns ) > iPosition ; iPosition++ ) {
 
 				if( structKeyExists( Parameters , "bSortable_#iPosition#" ) eq 0 )
 					Parameters[ "bSortable_#iPosition#" ]= "";
@@ -213,6 +227,7 @@ Description
 		var stColumn= "";
 		var stSearchColumn= "";
 		var stSortingColumn= "";
+		var	bShownNothingMatch=	false;
 
 		lsColumnNames= Query.columnList;
 
@@ -233,13 +248,36 @@ Description
 
 				</cfif>
 
-				#stColumn.Name#
+				[Query].[#stColumn.Name#]
 
 				<cfset bFirstColumn= false />
 
 			</cfif>
 
 		</cfloop>
+
+		<!---	Create Case Insensitive Order By Columns	--->
+		<cfif len( stParameters.iSortingCols )
+			and stParameters.iSortingCols
+			and arrayLen( stParameters.sortingColumns )>
+			,
+
+			<cfloop array= "#stParameters.sortingColumns#" index= "stSortingColumn">
+				<cfif listFindNoCase( lsColumnNames , stSortingColumn.name )>
+					UPPER( [Query].[#stSortingColumn.name#] ) AS [OrderBy#stSortingColumn.name#]
+
+					<cfif iSortingColumnCount lt stParameters.iSortingCols>
+						,
+
+					</cfif>
+
+					<cfset iSortingColumnCount++ />
+
+				</cfif>
+
+			</cfloop>
+
+		</cfif>
 
 		</cfoutput>
 
@@ -255,13 +293,17 @@ Description
 
 		<cfoutput>
 
+		<!---	Reset Sorting Column Counter	--->
+		<cfset iSortingColumnCount=	1 />
+
+		<!---	Create Order By	--->
 		<cfif len( stParameters.iSortingCols )
 			and stParameters.iSortingCols
 			and arrayLen( stParameters.sortingColumns )>
 
 			<cfloop array= "#stParameters.sortingColumns#" index= "stSortingColumn">
 				<cfif listFindNoCase( lsColumnNames , stSortingColumn.name )>
-					#stSortingColumn.name#
+					[OrderBy#stSortingColumn.name#]
 
 					<cfif listFindNoCase( stSortingColumn.dir , "DESC" )>
 						DESC
@@ -303,14 +345,53 @@ Description
 			<cfloop array= "#stParameters.columns#" index= "stSearchColumn">
 				<cfif listFindNoCase( lsColumnNames , stSearchColumn.name )>
 				<!--- TODO: Possible SQL Injection here? [#stSearchColumn.name#] Try and queryparam it. --->
-				or CAST( lower( [#stSearchColumn.name#] ) AS VARCHAR ) like
+				or CAST( lower( [Query].[#stSearchColumn.name#] ) AS VARCHAR ) like
 					<cfqueryparam cfsqltype= "varchar" value= "%#lcase( stParameters.sSearch )#%" />
+				or CAST( lower( [Query].[#stSearchColumn.name#] ) AS VARCHAR ) like
+					<cfqueryparam cfsqltype= "varchar" value= "%#lcase( grimVariable( stParameters.sSearch ) )#%" />
 
 				</cfif>
 
 			</cfloop>
 
 		   )
+
+		<cfelse>
+			<cfloop array= "#stParameters.columns#" index= "stSearchColumn">
+				<cfif	len( stSearchColumn.sSearch )
+						and	listFindNoCase( lsColumnNames , stSearchColumn.name )>
+					<cfif	bShownNothingMatch eq false>
+					and (
+						1= 0	<!---  Matches nothing. Allows for conditional OR syntax below. --->
+
+						<cfset	bShownNothingMatch=	true />
+
+					</cfif>
+
+					<!--- TODO: Possible SQL Injection here? [#stSearchColumn.name#] Try and queryparam it. --->
+					or CAST( lower( [Query].[#stSearchColumn.name#] ) AS VARCHAR ) like
+						<cfqueryparam cfsqltype= "varchar" value= "%#lcase( stSearchColumn.sSearch )#%" />
+					or CAST( lower( [Query].[#stSearchColumn.name#] ) AS VARCHAR ) like
+						<cfqueryparam cfsqltype= "varchar" value= "%#lcase( grimVariable( stSearchColumn.sSearch ) )#%" />
+
+				</cfif>
+
+			</cfloop>
+
+			<cfif	bShownNothingMatch>
+		   )
+
+			</cfif>
+
+			<cfloop array= "#stParameters.columns#" index= "stSearchColumn">
+				<cfif	len( stSearchColumn.sSearch )
+						and	listFindNoCase( lsColumnNames , stSearchColumn.name )>
+				and [Query].[#stSearchColumn.name#] IS NOT NULL
+
+				</cfif>
+
+			</cfloop>
+
 		</cfif>
 
 		<!--- Order --->
@@ -322,7 +403,6 @@ Description
 		</cfquery>
 
 		<cfreturn qResult />
-
 	</cffunction>
 
 	<cffunction name= "formatQuery"
@@ -364,7 +444,7 @@ Description
 
 				</cfif>
 
-				cast( #stColumn.Name# as VARCHAR ) #stColumn.Name#
+				cast( [Query].[#stColumn.Name#] as VARCHAR ) [#stColumn.Name#]
 
 				<cfset bFirstColumn= false />
 

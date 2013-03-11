@@ -15,7 +15,7 @@ Description
 	output= false
 	hint= "Handles server interactions for DataTables">
 
-	<cfinclude	template=	"/app/includes/helpers/scrubRequestHelper.cfm" />
+	<cfinclude	template=	"../scrubRequestHelper.cfm" />
 
 	<cffunction name= "toObject"
 		output= false
